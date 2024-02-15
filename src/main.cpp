@@ -36,10 +36,11 @@ String sendMsg = BT_NAME;
 String mainTopic = MAIN_TOPIC;
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
-const char* mqttServer = "192.168.1.32";
+const char* mqttServer = "192.168.1.25";    //192.168.1.25 //public.mqtthq.com
 const int mqttPort = 1883;
 const char* mqttUsername = "your_mqtt_username";
 const char* mqttPassword = "your_mqtt_password";
+const char* macaddres = "4tcd099d51f0";
 
 uint8_t seconds=0, minuts=0, hour=0;
 String topic, payload;
@@ -69,6 +70,7 @@ bool isConnected = false;
 bool btKeyHigh = false;
 bool btReady = false;
 bool escIsEnabled = false;
+bool mqttsend = false;
 String sendBuffer;
 String commandBuffer;
 
@@ -254,6 +256,57 @@ void sendMqttBroker(void) {
     ++seconds;
     minuts = seconds%2;
     hour = seconds%5;
+    topic = "homeassistant/sensor/";
+    topic +=  macaddres;
+    topic += "_temper1/config";
+
+  payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node-1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
+  payload += macaddres;
+//   payload += "_temper1\"}";
+  payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"";
+  payload += macaddres;
+  payload += "\"]}}";
+
+  Serial.println("-------------------------------------------------------------");
+  Serial.println(topic);
+  Serial.println(payload.c_str());
+//   mqttsend = mqttClient.publish(topic.c_str(), payload.c_str(), false);  
+//   Serial.println(mqttsend);  
+    mqttClient.beginPublish(topic.c_str(),payload.length(),false);
+    mqttClient.print(payload.c_str());
+    mqttsend = mqttClient.endPublish();
+    Serial.println(mqttsend);
+
+    mainTopic = MAIN_TOPIC + String(1);
+    topic = mainTopic + "/temper1";
+    payload = String((double)upv.pv.pvT[0]/10,1);
+    // Serial.println("MESH -> MQTT: Forward message to MQTT broker, to " + topic + " = " + payload);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/temper2";
+    payload = String((double)upv.pv.pvT[1]/10,1);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/temper3";
+    payload = String((double)upv.pv.pvT[2]/10,1);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/humidity";
+    payload = String(upv.pv.pvRH);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/flap";
+    payload = String(upv.pv.pvFlap);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/power";
+    payload = String(upv.pv.power);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/fuses";
+    payload = String(upv.pv.fuses);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/warning";
+    payload = String(upv.pv.warning);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/errors";
+    payload = String(upv.pv.errors);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    mainTopic = MAIN_TOPIC + String(2);
     topic = mainTopic + "/temper1";
     payload = String((double)upv.pv.pvT[0]/10,1);
     // Serial.println("MESH -> MQTT: Forward message to MQTT broker, to " + topic + " = " + payload);
