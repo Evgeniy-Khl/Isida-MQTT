@@ -40,7 +40,7 @@ const char* mqttServer = "192.168.1.25";    //192.168.1.25 //public.mqtthq.com
 const int mqttPort = 1883;
 const char* mqttUsername = "your_mqtt_username";
 const char* mqttPassword = "your_mqtt_password";
-const char* macaddres = "4tcd099d51f0";
+const char* macaddres;
 
 uint8_t seconds=0, minuts=0, hour=0;
 String topic, payload;
@@ -148,6 +148,13 @@ void setup() {
 //----------------------------------------------------------------------------------------------------
     digitalWrite(PIN_READY, HIGH);
     pinMode(PIN_READY, OUTPUT);
+    Serial.print("ESP Board MAC Address:  ");
+    Serial.println(WiFi.macAddress());
+    String identif = "isida_";
+    identif += WiFi.macAddress();
+    identif.replace(":","");
+    Serial.print("identifiers:  ");
+    Serial.println(identif);
     Serial.println();
     Serial.println("WiFi.begin(Andrew_2023)");
     // Инициализация Wi-Fi и подключение к сети
@@ -166,6 +173,28 @@ void setup() {
     // Подключение к MQTT брокеру
     Serial.println("setup()->Connecting to MQTT ...");
     connectMqttBroker();
+    //------------------------------- Discovery topic ------------------------------------------------------------
+    macaddres = "4tcd099d51f0";
+    topic = "homeassistant/sensor/";
+    topic +=  macaddres;
+    topic += "_temper1/config";
+
+    payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node-1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
+    payload += macaddres;
+    payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"";
+    payload += macaddres;
+    payload += "\"]}}";
+    Serial.println();
+    Serial.print("Discovery topic: ");
+    Serial.println(topic);
+    Serial.println(payload.c_str());
+    Serial.println();
+    mqttClient.beginPublish(topic.c_str(),payload.length(),false);
+    mqttClient.print(payload.c_str());
+    mqttsend = mqttClient.endPublish();
+    if(mqttsend) Serial.println("Discovery topic sent successfully.");
+    else Serial.println("Discovery topic not sent!!");
+    //-------------------------------------------------------------------------------------------------------------
 }
 
 void loop() {
@@ -256,26 +285,6 @@ void sendMqttBroker(void) {
     ++seconds;
     minuts = seconds%2;
     hour = seconds%5;
-    topic = "homeassistant/sensor/";
-    topic +=  macaddres;
-    topic += "_temper1/config";
-
-  payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node-1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
-  payload += macaddres;
-//   payload += "_temper1\"}";
-  payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"";
-  payload += macaddres;
-  payload += "\"]}}";
-
-  Serial.println("-------------------------------------------------------------");
-  Serial.println(topic);
-  Serial.println(payload.c_str());
-//   mqttsend = mqttClient.publish(topic.c_str(), payload.c_str(), false);  
-//   Serial.println(mqttsend);  
-    mqttClient.beginPublish(topic.c_str(),payload.length(),false);
-    mqttClient.print(payload.c_str());
-    mqttsend = mqttClient.endPublish();
-    Serial.println(mqttsend);
 
     mainTopic = MAIN_TOPIC + String(1);
     topic = mainTopic + "/temper1";
