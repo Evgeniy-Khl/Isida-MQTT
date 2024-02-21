@@ -44,16 +44,8 @@ const char* macaddres;
 
 uint8_t seconds=0, minuts=0, hour=0;
 String topic, payload;
-union {
-  uint8_t data[7];
-  struct {
-    uint8_t ip[4];    // 4 байт ind=41;ind=42; ind=43;ind=44; IP MQTT broker [192.168.100.100]
-    uint16_t port;    // 2 байт ind=45;ind=46; [1883]		 Port MQTT broker
-    uint8_t group;    // 1 байт ind=47;        группа узлов MQTT broker
-  } ip;
-} ipport;
-bool ifconfig = false;
-bool ifdatacomplit = false;
+
+bool datacomplit = false;
 // ------------------  Multiserial  ------------------------------------
 BluetoothSerial SerialBT;
 HardwareSerial UCSerial(1);
@@ -110,17 +102,18 @@ void setup() {
 
     Serial.println("Waiting for STM32 transmission.");
     //----- Wait BT_Name -----
-    indData = 0; 
-    while(!ifconfig)
+    while(!datacomplit)
     {
         if(UCSerial.available()) {
             receiveUCSerial();
         }
     }
-    upv.pv.cellID = 1;
-    indData = 0;
-    sendMsg = "ISIDA-" + String(upv.pv.cellID);
-    mainTopic += String(upv.pv.cellID);
+    upv.pv.node = 1;
+    Serial.println();
+    String tempstr = String(upv.pv.ip[0])+'.'+String(upv.pv.ip[1])+'.'+String(upv.pv.ip[2])+'.'+String(upv.pv.ip[3]);
+    Serial.print("MQTT IP:"); Serial.println(tempstr);
+    sendMsg = "ISIDA-" + String(upv.pv.node);
+    mainTopic += String(upv.pv.node);
     Serial.print("New name bluetooth:"); Serial.println(sendMsg);
     Serial.print("New name topic:"); Serial.println(mainTopic);
     SerialBT.begin(sendMsg);
@@ -179,7 +172,7 @@ void setup() {
     topic +=  macaddres;
     topic += "_temper1/config";
 
-    payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node-1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
+    payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
     payload += macaddres;
     payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"";
     payload += macaddres;
@@ -300,34 +293,14 @@ void sendMqttBroker(void) {
     topic = mainTopic + "/humidity";
     payload = String(upv.pv.pvRH);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/flap";
-    payload = String(upv.pv.pvFlap);
+    topic = mainTopic + "/carbon";
+    payload = String(upv.pv.pvCO2);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/power";
-    payload = String(upv.pv.power);
+    topic = mainTopic + "/timer";
+    payload = String(upv.pv.pvTimer);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/fuses";
-    payload = String(upv.pv.fuses);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/warning";
-    payload = String(upv.pv.warning);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/errors";
-    payload = String(upv.pv.errors);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    mainTopic = MAIN_TOPIC + String(2);
-    topic = mainTopic + "/temper1";
-    payload = String((double)upv.pv.pvT[0]/10,1);
-    // Serial.println("MESH -> MQTT: Forward message to MQTT broker, to " + topic + " = " + payload);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/temper2";
-    payload = String((double)upv.pv.pvT[1]/10,1);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/temper3";
-    payload = String((double)upv.pv.pvT[2]/10,1);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/humidity";
-    payload = String(upv.pv.pvRH);
+    topic = mainTopic + "/fan";
+    payload = String(upv.pv.pvFan);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/flap";
     payload = String(upv.pv.pvFlap);
@@ -338,11 +311,41 @@ void sendMqttBroker(void) {
     topic = mainTopic + "/fuses";
     payload = String(upv.pv.fuses);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/errors";
+    payload = String(upv.pv.errors);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/warning";
     payload = String(upv.pv.warning);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/errors";
-    payload = String(upv.pv.errors);
+    topic = mainTopic + "/other0";
+    payload = String(upv.pv.other0);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/other1";
+    payload = String(upv.pv.other1);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/other2";
+    payload = String(upv.pv.other2);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/set1";
+    payload = String((double)upv.pv.spT[0]/10,1);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/set2";
+    payload = String((double)upv.pv.spT[1]/10,1);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/set3";
+    payload = String(upv.pv.spRH[1]);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/state";
+    payload = String(upv.pv.state);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/extendmode";
+    payload = String(upv.pv.extendMode);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/relaymode";
+    payload = String(upv.pv.relayMode);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/programm";
+    payload = String(upv.pv.programm);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
 }
 
@@ -428,29 +431,17 @@ void receiveUCSerial(){
                 sendBufferNow();
             }
         } else {    //------------- передача масива для MQTT -------------------------------
-            if(!ifconfig){
-               ipport.data[indData++] = read;
-                if(ipport.data[indData-1]==10 && ipport.data[indData-2]==13) {
-                    indData = 0;
-                    Serial.println();
-                    String tempstr = String(ipport.ip.ip[0])+'.'+String(ipport.ip.ip[1])+'.'+String(ipport.ip.ip[2])+'.'+String(ipport.ip.ip[3]);
-                    Serial.print("MQTT IP:"); Serial.println(tempstr);
-                    tempstr = String(ipport.ip.port);
-                    Serial.print("MQTT Port:"); Serial.println(tempstr);
-                    tempstr = String(ipport.ip.group);
-                    Serial.print("MQTT Group:"); Serial.println(tempstr);
-                    ifconfig =true;
+            upv.pvdata[indData++] = read;
+            if(upv.pvdata[indData-1]==10 && upv.pvdata[indData-2]==13) {
+                indData = 0;
+                if(indData==MQTT_SEND_BUFFER){
+                    datacomplit = true;
                     digitalWrite(PIN_WIFI_CONECTED, HIGH);  // WiFi conected!
-                } 
-            }else {
-                upv.pvdata[indData++] = read;
-                if(upv.pvdata[indData-1]==10 && upv.pvdata[indData-2]==13) {
-                    indData = 0;
-                    // Serial.println("Reseive upv.pvdata!");
                 }
             }
-            
+            else if(indData>MQTT_SEND_BUFFER) indData = 0;
         }
+            
     }
 }
 //-------------------------------------------------------------------------
