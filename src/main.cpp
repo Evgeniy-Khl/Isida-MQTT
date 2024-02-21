@@ -40,11 +40,17 @@ const char* mqttServer = "192.168.1.25";    //192.168.1.25 //public.mqtthq.com
 const int mqttPort = 1883;
 const char* mqttUsername = "your_mqtt_username";
 const char* mqttPassword = "your_mqtt_password";
-const char* macaddres;
 
-uint8_t seconds=0, minuts=0, hour=0;
+uint8_t seconds=0;
 String topic, payload;
-
+union {
+  uint8_t data[5];
+  struct {
+    uint8_t node;    // 1 байт Port MQTT broker
+    uint8_t ip[4];   // 4 байт IP MQTT broker [192.168.1.25]
+  } ip;
+} ipcnf;
+bool ifconfig = false;
 bool datacomplit = false;
 // ------------------  Multiserial  ------------------------------------
 BluetoothSerial SerialBT;
@@ -56,7 +62,7 @@ uint8_t BT_CTRL_ESCAPE_SEQUENCE_LENGTH = sizeof(BT_CTRL_ESCAPE_SEQUENCE)/sizeof(
 
 double dbTemp = 199.9;
 
-unsigned long lastSend = 0, lastSendMqtt = 0;
+unsigned long lastSend = 0, lastSendMqtt = 0, lastReceiveUC = 0;
 unsigned long blinkLed = 0;
 bool isConnected = false;
 bool btKeyHigh = false;
@@ -65,6 +71,7 @@ bool escIsEnabled = false;
 bool mqttsend = false;
 String sendBuffer;
 String commandBuffer;
+String identif;
 
 int8_t escapeSequencePos = 0;
 unsigned long lastEscapeSequenceChar = 0;
@@ -81,13 +88,18 @@ void setup() {
   upv.pvdata[indData]=0;
   // pinMode(LED, OUTPUT);
   // ------------------  Multiserial  ------------------------------------
+    pinMode(UC_NRST, INPUT);
     pinMode(BT_KEY, INPUT_PULLDOWN);
+
     pinMode(PIN_WIFI_CONECTED, OUTPUT);
     digitalWrite(PIN_WIFI_CONECTED, LOW);  // WiFi NO conected!
     pinMode(PIN_CONNECTED, OUTPUT);
     digitalWrite(PIN_CONNECTED, LOW);
-    pinMode(UC_NRST, INPUT);
-
+    pinMode(PIN_MONITOR, OUTPUT);
+    digitalWrite(PIN_MONITOR, LOW);
+    pinMode(PIN_READY, OUTPUT);
+    digitalWrite(PIN_READY, HIGH);
+    
     
     UCSerial.begin(9600, SERIAL_8N1, UC_RX, UC_TX);
     UCSerial.setRxBufferSize(1024);
@@ -101,22 +113,24 @@ void setup() {
     setupCommands();
 
     Serial.println("Waiting for STM32 transmission.");
-    //----- Wait BT_Name -----
-    while(!datacomplit)
+    //----- Wait MQTT data -----
+    indData = 0;
+    while(!ifconfig)
     {
         if(UCSerial.available()) {
             receiveUCSerial();
         }
     }
-    upv.pv.node = 1;
+    mainTopic = MAIN_TOPIC + String(ipcnf.ip.node);
     Serial.println();
-    String tempstr = String(upv.pv.ip[0])+'.'+String(upv.pv.ip[1])+'.'+String(upv.pv.ip[2])+'.'+String(upv.pv.ip[3]);
-    Serial.print("MQTT IP:"); Serial.println(tempstr);
-    sendMsg = "ISIDA-" + String(upv.pv.node);
-    mainTopic += String(upv.pv.node);
-    Serial.print("New name bluetooth:"); Serial.println(sendMsg);
-    Serial.print("New name topic:"); Serial.println(mainTopic);
-    SerialBT.begin(sendMsg);
+    Serial.print("MQTT Main topic:"); Serial.println(mainTopic);
+    // identif = String(upv.pv.ip[0])+'.'+String(upv.pv.ip[1])+'.'+String(upv.pv.ip[2])+'.'+String(upv.pv.ip[3]);
+    // Serial.print("MQTT IP:"); Serial.println(identif);
+
+    //------- New name bluetooth -------
+    identif = "ISIDA-" + String(ipcnf.ip.node);
+    Serial.print("New name bluetooth:"); Serial.println(identif);
+    SerialBT.begin(identif);
     CmdSerial.addInterface(&SerialBT);
 
     while(CmdSerial.available()) {
@@ -134,23 +148,11 @@ void setup() {
     Serial.print("Serial Bridge Ready: ");
     Serial.println(sendMsg);
 
-    commandPrompt();
-
-    digitalWrite(PIN_MONITOR, LOW);
-    pinMode(PIN_MONITOR, OUTPUT);
-//----------------------------------------------------------------------------------------------------
-    digitalWrite(PIN_READY, HIGH);
-    pinMode(PIN_READY, OUTPUT);
-    Serial.print("ESP Board MAC Address:  ");
-    Serial.println(WiFi.macAddress());
-    String identif = "isida_";
-    identif += WiFi.macAddress();
-    identif.replace(":","");
-    Serial.print("identifiers:  ");
-    Serial.println(identif);
+    commandPrompt();  
+    //------------- Инициализация Wi-Fi и подключение к сети -------------
     Serial.println();
     Serial.println("WiFi.begin(Andrew_2023)");
-    // Инициализация Wi-Fi и подключение к сети
+
     WiFi.begin("Andrew_2023", "graviton19630301");
     while (WiFi.status() != WL_CONNECTED) {
         delay(1000);
@@ -159,35 +161,44 @@ void setup() {
      
     Serial.print("WiFi conected IP: ");
     Serial.println(WiFi.localIP());
-    // Настройка MQTT клиента
+    //---------------------- Настройка MQTT клиента -----------------------
     mqttClient.setServer(mqttServer, mqttPort);
     mqttClient.setCallback(mqttCallback);
     
-    // Подключение к MQTT брокеру
-    Serial.println("setup()->Connecting to MQTT ...");
+    //---------------------- Подключение к MQTT брокеру --------------------
     connectMqttBroker();
-    //------------------------------- Discovery topic ------------------------------------------------------------
-    macaddres = "4tcd099d51f0";
-    topic = "homeassistant/sensor/";
-    topic +=  macaddres;
-    topic += "_temper1/config";
+    //---------------------- Discovery topic -------------------------------
+    Serial.print("ESP Board MAC Address:  ");
+    Serial.println(WiFi.macAddress());
+    identif = "isida_" + WiFi.macAddress();
+    identif.replace(":","");
+    Serial.print("identifiers:  ");
+    Serial.println(identif);
+    topic = "homeassistant/sensor/" + identif + "_temper1/config";
 
-    payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
-    payload += macaddres;
-    payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"";
-    payload += macaddres;
-    payload += "\"]}}";
-    Serial.println();
-    Serial.print("Discovery topic: ");
-    Serial.println(topic);
-    Serial.println(payload.c_str());
-    Serial.println();
+    Serial.println(); Serial.print("Discovery topic: "); Serial.println(topic);
+
+    // payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
+    // payload += identif;
+    // payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"" + identif + "\"]}}";
+    std::string payload = "{\"name\": \"Temper1\","
+                     "\"state_topic\": \"" + std::string(mainTopic.c_str()) + "/temper1\","
+                     "\"device_class\": \"temperature\","
+                     "\"value_template\": \"{{ value | round(2) }}\","
+                     "\"unique_id\":\"" + std::string(identif.c_str()) + "_temper1\","
+                     "\"device\": {"
+                     "\"name\": \"ISIDA\","
+                     "\"identifiers\": [\"" + std::string(identif.c_str()) + "\"]"
+                     "}}";
+    
+    Serial.println(payload.c_str()); Serial.println();
+
     mqttClient.beginPublish(topic.c_str(),payload.length(),false);
     mqttClient.print(payload.c_str());
     mqttsend = mqttClient.endPublish();
     if(mqttsend) Serial.println("Discovery topic sent successfully.");
     else Serial.println("Discovery topic not sent!!");
-    //-------------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------
 }
 
 void loop() {
@@ -269,6 +280,7 @@ void loop() {
     }
   }
 }//***************** END loop() ****************************************
+
 void receivedCallback(uint32_t from, String &msg) {
   // Обработка полученных сообщений от других узлов в сети mesh
   // ...
@@ -276,10 +288,12 @@ void receivedCallback(uint32_t from, String &msg) {
 
 void sendMqttBroker(void) {
     ++seconds;
-    minuts = seconds%2;
-    hour = seconds%5;
-
-    mainTopic = MAIN_TOPIC + String(1);
+    topic = mainTopic + "/model";
+    payload = String(upv.pv.model);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/node";
+    payload = String(upv.pv.node);
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/temper1";
     payload = String((double)upv.pv.pvT[0]/10,1);
     // Serial.println("MESH -> MQTT: Forward message to MQTT broker, to " + topic + " = " + payload);
@@ -431,17 +445,43 @@ void receiveUCSerial(){
                 sendBufferNow();
             }
         } else {    //------------- передача масива для MQTT -------------------------------
-            upv.pvdata[indData++] = read;
-            if(upv.pvdata[indData-1]==10 && upv.pvdata[indData-2]==13) {
-                indData = 0;
-                if(indData==MQTT_SEND_BUFFER){
-                    datacomplit = true;
+            if(!ifconfig){
+               ipcnf.data[indData++] = read;
+                if(ipcnf.data[indData-1]==10 && ipcnf.data[indData-2]==13) {
+                    indData = 0;
+                    ifconfig = true;
                     digitalWrite(PIN_WIFI_CONECTED, HIGH);  // WiFi conected!
+                    Serial.println();
+                    String tempstr = String(ipcnf.ip.node);
+                    Serial.print("MQTT Node:"); Serial.println(tempstr);
+                    tempstr = String(ipcnf.ip.ip[0])+'.'+String(ipcnf.ip.ip[1])+'.'+String(ipcnf.ip.ip[2])+'.'+String(ipcnf.ip.ip[3]);
+                    Serial.print("MQTT IP:"); Serial.println(tempstr);
+                } 
+            }else {
+                if(millis() - lastReceiveUC > MAX_SEND_WAIT*10){
+                    indData = 0;
+                    // Serial.print("lastReceiveUC:"); Serial.println(millis() - lastReceiveUC);
+                    lastReceiveUC = millis();
                 }
-            }
-            else if(indData>MQTT_SEND_BUFFER) indData = 0;
-        }
+                upv.pvdata[indData++] = read;
+                if(upv.pvdata[indData-1]==10 && upv.pvdata[indData-2]==13) {
+                    indData = 0;
+                }
+            // upv.pvdata[indData++] = read;
+            // if(upv.pvdata[indData-1]==10 && upv.pvdata[indData-2]==13) {
+            //     indData = 0;
+            //     if(indData==MQTT_SEND_BUFFER){
+            //         datacomplit = true;
+            //         digitalWrite(PIN_WIFI_CONECTED, HIGH);  // WiFi conected!
+            //     }
+            // }
+            // else if(indData>MQTT_SEND_BUFFER){
+            //   indData = 0; 
+
+            // }
             
+            }
+        }
     }
 }
 //-------------------------------------------------------------------------
