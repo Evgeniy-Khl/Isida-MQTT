@@ -5,7 +5,7 @@
 // 2. blink cycle repeats every BLINK_PERIOD
 // 3. sends a silly message to every node on the mesh at a random time between 1 and 5 seconds
 // 4. prints anything it receives to Serial.print
-//
+// Flash: [=======   ]  71.6% (used 1501589 bytes from 2097152 bytes)
 //
 //************************************************************
 #include "Arduino.h"
@@ -26,14 +26,15 @@ void mqttCallback(char *topic, byte *payload, unsigned int length);
 void newConnectionCallback(const uint32_t &id);
 void connectMqttBroker(void);
 void sendMqttBroker(void);
+void mqttConfig(void);
 
 void receivedCallback(uint32_t from, String & msg);
 void receiveUCSerial(void);
 void sendBufferNow(void);
 void receiveBlueTooth(void);
 
+
 String sendMsg = BT_NAME;
-String mainTopic = MAIN_TOPIC;
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 const char* mqttServer = "192.168.1.25";    //192.168.1.25 //public.mqtthq.com
@@ -42,7 +43,7 @@ const char* mqttUsername = "your_mqtt_username";
 const char* mqttPassword = "your_mqtt_password";
 
 uint8_t seconds=0;
-String topic, payload;
+String topic, payload,  mainTopic = MAIN_TOPIC, identif;
 union {
   uint8_t data[5];
   struct {
@@ -71,7 +72,6 @@ bool escIsEnabled = false;
 bool mqttsend = false;
 String sendBuffer;
 String commandBuffer;
-String identif;
 
 int8_t escapeSequencePos = 0;
 unsigned long lastEscapeSequenceChar = 0;
@@ -167,31 +167,7 @@ void setup() {
     
     //---------------------- Подключение к MQTT брокеру --------------------
     connectMqttBroker();
-    //---------------------- Discovery topic -------------------------------
-    Serial.print("ESP Board MAC Address:  ");
-    Serial.println(WiFi.macAddress());
-    identif = "isida_" + WiFi.macAddress();
-    identif.replace(":","");
-    Serial.print("identifiers:  ");
-    Serial.println(identif);
-    topic = "homeassistant/sensor/" + identif + "_temper1/config";
-
-    Serial.println(); Serial.print("Discovery topic: "); Serial.println(topic);
-
-    // payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
-    // payload += identif;
-    // payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"" + identif + "\"]}}";
-    std::string payload = "{\"name\": \"Temper1\","
-                     "\"state_topic\": \"" + std::string(mainTopic.c_str()) + "/temper1\","
-                     "\"device_class\": \"temperature\","
-                     "\"value_template\": \"{{ value | round(2) }}\","
-                     "\"unique_id\":\"" + std::string(identif.c_str()) + "_temper1\","
-                     "\"device\": {"
-                     "\"name\": \"ISIDA\","
-                     "\"identifiers\": [\"" + std::string(identif.c_str()) + "\"]"
-                     "}}";
-    
-    Serial.println(payload.c_str()); Serial.println();
+    mqttConfig();
 
     mqttClient.beginPublish(topic.c_str(),payload.length(),false);
     mqttClient.print(payload.c_str());
@@ -265,8 +241,6 @@ void loop() {
             receiveBlueTooth();
         }
     }
-
-//---------- Подключение к MQTT брокеру, если соединение разорвано ------------
   
   // Обработка MQTT сообщений
   mqttClient.loop();
@@ -280,140 +254,6 @@ void loop() {
     }
   }
 }//***************** END loop() ****************************************
-
-void receivedCallback(uint32_t from, String &msg) {
-  // Обработка полученных сообщений от других узлов в сети mesh
-  // ...
-}
-
-void sendMqttBroker(void) {
-    ++seconds;
-    topic = mainTopic + "/model";
-    payload = String(upv.pv.model);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/node";
-    payload = String(upv.pv.node);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/temper1";
-    payload = String((double)upv.pv.pvT[0]/10,1);
-    // Serial.println("MESH -> MQTT: Forward message to MQTT broker, to " + topic + " = " + payload);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/temper2";
-    payload = String((double)upv.pv.pvT[1]/10,1);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/temper3";
-    payload = String((double)upv.pv.pvT[2]/10,1);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/humidity";
-    payload = String(upv.pv.pvRH);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/carbon";
-    payload = String(upv.pv.pvCO2);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/timer";
-    payload = String(upv.pv.pvTimer);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/fan";
-    payload = String(upv.pv.pvFan);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/flap";
-    payload = String(upv.pv.pvFlap);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/power";
-    payload = String(upv.pv.power);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/fuses";
-    payload = String(upv.pv.fuses);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/errors";
-    payload = String(upv.pv.errors);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/warning";
-    payload = String(upv.pv.warning);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/other0";
-    payload = String(upv.pv.other0);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/other1";
-    payload = String(upv.pv.other1);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/other2";
-    payload = String(upv.pv.other2);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/set1";
-    payload = String((double)upv.pv.spT[0]/10,1);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/set2";
-    payload = String((double)upv.pv.spT[1]/10,1);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/set3";
-    payload = String(upv.pv.spRH[1]);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/state";
-    payload = String(upv.pv.state);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/extendmode";
-    payload = String(upv.pv.extendMode);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/relaymode";
-    payload = String(upv.pv.relayMode);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/programm";
-    payload = String(upv.pv.programm);
-    mqttClient.publish(topic.c_str(), payload.c_str(), true);
-}
-
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  // Обработка полученного сообщения от MQTT брокера
-  // ...
-}
-
-void connectMqttBroker() {
-//   while (!mqttClient.connected()) {
-    Serial.println("Connecting to MQTT broker...");
-    if (mqttClient.connect("ESP8266Client")) {
-      Serial.println("Connected to MQTT broker!");
-      mqttClient.subscribe("topic1");
-      mqttClient.subscribe("topic2");
-    } else {
-      Serial.print("Failed to connect to MQTT broker, MQTT_");
-      switch (mqttClient.state())
-      {
-      case MQTT_CONNECTION_TIMEOUT:
-        Serial.print("CONNECTION_TIMEOUT");
-        break;
-      case MQTT_CONNECTION_LOST:
-        Serial.print("CONNECTION_LOST");
-        break;
-      case MQTT_CONNECT_FAILED:
-        Serial.print("CONNECT_FAILED");
-        break;
-      case MQTT_DISCONNECTED:
-        Serial.print("DISCONNECTED");
-        break;
-      case MQTT_CONNECT_BAD_PROTOCOL:
-        Serial.print("CONNECT_BAD_PROTOCOL");
-        break;
-      case MQTT_CONNECT_BAD_CLIENT_ID:
-        Serial.print("CONNECT_BAD_CLIENT_ID");
-        break;
-      case MQTT_CONNECT_UNAVAILABLE:
-        Serial.print("CONNECT_UNAVAILABLE");
-        break;
-      case MQTT_CONNECT_BAD_CREDENTIALS:
-        Serial.print("CONNECT_BAD_CREDENTIALS");
-        break;
-      case MQTT_CONNECT_UNAUTHORIZED:
-        Serial.print("CONNECT_UNAUTHORIZED");
-        break;
-      default:
-        break;
-      }
-      Serial.println(" Retrying in 5 seconds...");
-    }
-//   }
-}
-
 
 // ------------------  Multiserial  ------------------------------------
 void receiveUCSerial(){
