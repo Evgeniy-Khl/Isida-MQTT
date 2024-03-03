@@ -60,20 +60,20 @@ void sendMqttBroker(void) {
     payload = String(upv.pv.pvCO2);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/timer";
-    payload = String(upv.pv.pvTimer);
+    payload = String(upv.pv.minuts);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/fan";
-    payload = String(upv.pv.pvFan);
+    payload = String(upv.pv.fan);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/flap";
-    payload = String(upv.pv.pvFlap);
+    payload = String(upv.pv.flap);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/power";
     payload = String(upv.pv.power);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     //------------- fuses -------------
     topic = mainTopic + "/fuses";
-    payload = String(upv.pv.fuses & 0x7F);
+    payload = String(upv.pv.fuses & 0x7F);    // bit 7 -  Состояние дверей
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/door";
     if(upv.pv.fuses & 0x80) payload = "open"; else payload = "closed";
@@ -110,8 +110,20 @@ void sendMqttBroker(void) {
     topic = mainTopic + "/incubation";
     if(upv.pv.state & 0x01) payload = "on"; else payload = "off";
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/heater_1";
+    if(upv.pv.state & 0x01) payload = "heat"; else payload = "off";
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/just_turn";
     if(upv.pv.state & 0x80) payload = "turn"; else payload = "off";
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/heater_2";
+    if(upv.pv.state & 0x80) payload = "heat"; else payload = "off";
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/humidifier/action";
+    if(upv.pv.state & 0x80) payload = "off"; else payload = "humidifying";
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/humidifier/state";
+    if(upv.pv.state & 0x80) payload = "0"; else payload = "1";
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     //------------------------------
     topic = mainTopic + "/extendmode";
