@@ -31,6 +31,7 @@ void mqttConfig(void);
 void receivedCallback(uint32_t from, String & msg);
 void receiveUCSerial(void);
 void sendBufferNow(void);
+void sendBufferUC(uint8_t sendBytes);
 void receiveBlueTooth(void);
 
 
@@ -58,7 +59,7 @@ bool datacomplit = false;
 BluetoothSerial SerialBT;
 HardwareSerial UCSerial(1);
 MultiSerial CmdSerial;
-
+uint8_t UC_SEQUENCE[] = {1,9,4,0,87,0,128,0,235,0,13,10};
 char BT_CTRL_ESCAPE_SEQUENCE[] = {'\4', '\4', '\4', '!'};
 uint8_t BT_CTRL_ESCAPE_SEQUENCE_LENGTH = sizeof(BT_CTRL_ESCAPE_SEQUENCE)/sizeof(BT_CTRL_ESCAPE_SEQUENCE[0]);
 
@@ -245,11 +246,20 @@ void loop() {
   
   // Обработка MQTT сообщений
   mqttClient.loop();
-  // Отправка MQTT сообщений
+  // Отправка MQTT сообщений каждые 5 сек.
   if(millis() - lastSendMqtt > MQTT_SEND_WAIT){
     lastSendMqtt = millis();
     if (mqttClient.connected()) {
         sendMqttBroker();
+        UC_SEQUENCE[1]++;
+        uint16_t crc=0;
+        for(int8_t i=0;i<8;i++) {
+        crc += UC_SEQUENCE[i];
+        crc ^= (crc>>2);
+        }
+        UC_SEQUENCE[8] = crc&0xFF;
+        UC_SEQUENCE[9] = (crc>>8)&0xFF;
+        sendBufferUC(12);
     } else {
         connectMqttBroker();
     }
@@ -390,5 +400,10 @@ void sendBufferNow() {
         }
     }
     sendBuffer = "";
+    lastSend = millis();
+}
+//-------------------------------------------------------------------------
+void sendBufferUC(uint8_t sendBytes) {
+    UCSerial.write(UC_SEQUENCE, sendBytes);
     lastSend = millis();
 }
