@@ -20,18 +20,18 @@ void mqttConfig(void) {
 
     Serial.println(); Serial.print("Discovery topic: "); Serial.println(topic);
 
-    // payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
-    // payload += identif;
-    // payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"" + identif + "\"]}}";
-    std::string payload = "{\"name\": \"Temper1\","
-                     "\"state_topic\": \"" + std::string(mainTopic.c_str()) + "/temper1\","
-                     "\"device_class\": \"temperature\","
-                     "\"value_template\": \"{{ value | round(2) }}\","
-                     "\"unique_id\":\"" + std::string(identif.c_str()) + "_temper1\","
-                     "\"device\": {"
-                     "\"name\": \"ISIDA\","
-                     "\"identifiers\": [\"" + std::string(identif.c_str()) + "\"]"
-                     "}}";
+    payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
+    payload += identif;
+    payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"" + identif + "\"]}}";
+    // std::string payload = "{\"name\": \"Temper1\","
+    //                  "\"state_topic\": \"" + std::string(mainTopic.c_str()) + "/temper1\","
+    //                  "\"device_class\": \"temperature\","
+    //                  "\"value_template\": \"{{ value | round(2) }}\","
+    //                  "\"unique_id\":\"" + std::string(identif.c_str()) + "_temper1\","
+    //                  "\"device\": {"
+    //                  "\"name\": \"ISIDA\","
+    //                  "\"identifiers\": [\"" + std::string(identif.c_str()) + "\"]"
+    //                  "}}";
     
     Serial.println(payload.c_str()); Serial.println();
 }
@@ -60,7 +60,7 @@ void sendMqttBroker(void) {
     payload = String(upv.pv.pvCO2);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/timer";
-    payload = String(upv.pv.minuts);
+    payload = String(upv.pv.nextTurn);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/fan";
     payload = String(upv.pv.fan);
@@ -85,15 +85,6 @@ void sendMqttBroker(void) {
     topic = mainTopic + "/warning";
     payload = String(upv.pv.warning);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    // topic = mainTopic + "/other0";
-    // payload = String(upv.pv.other0);
-    // mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    // topic = mainTopic + "/other1";
-    // payload = String(upv.pv.other1);
-    // mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    // topic = mainTopic + "/other2";
-    // payload = String(upv.pv.other2);
-    // mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/set1";
     payload = String((double)upv.pv.spT[0]/10,1);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);

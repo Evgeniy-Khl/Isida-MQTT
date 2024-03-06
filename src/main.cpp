@@ -45,8 +45,9 @@ const char* mqttPassword = "your_mqtt_password";
 uint8_t seconds=0;
 String topic, payload,  mainTopic = MAIN_TOPIC, identif;
 union {
-  uint8_t data[5];
+  uint8_t data[6];
   struct {
+    uint8_t model;   // 1 байт ind=0  модель прибора
     uint8_t node;    // 1 байт Port MQTT broker
     uint8_t ip[4];   // 4 байт IP MQTT broker [192.168.1.25]
   } ip;
@@ -179,11 +180,10 @@ void setup() {
 
 void loop() {
   // digitalWrite(LED, !onFlag);
-  // ------------------  Multiserial  ------------------------------------
+// ------------------  Multiserial  ------------------------------------
     commandLoop();
 
     bool _connected = SerialBT.hasClient();
-
     if(isConnected != _connected) {
         isConnected = _connected;
         if(isConnected) {
@@ -194,6 +194,7 @@ void loop() {
         }
         digitalWrite(PIN_CONNECTED, isConnected);
     }
+// ------------- blue LED flashing -------------------------------------------
     if(isConnected){                    // подключен к BT горит постоянно
         digitalWrite(PIN_READY, HIGH);
     } else if(escIsEnabled){            // в режиме Esc последовательности медлено мигает
@@ -217,7 +218,7 @@ void loop() {
             btReady = true;
         }
     }
-
+//-------------------------------------------------------------------------------
     bool _btKeyHigh = digitalRead(BT_KEY) == HIGH;
 
     if(btKeyHigh != _btKeyHigh) {
@@ -285,19 +286,21 @@ void receiveUCSerial(){
                 sendBufferNow();
             }
         } else {    //------------- передача масива для MQTT -------------------------------
-            if(!ifconfig){
+            if(!ifconfig){  // передача первичных данных
                ipcnf.data[indData++] = read;
                 if(ipcnf.data[indData-1]==10 && ipcnf.data[indData-2]==13) {
                     indData = 0;
                     ifconfig = true;
                     digitalWrite(PIN_WIFI_CONECTED, HIGH);  // WiFi conected!
                     Serial.println();
-                    String tempstr = String(ipcnf.ip.node);
-                    Serial.print("MQTT Node:"); Serial.println(tempstr);
+                    String tempstr = String(ipcnf.ip.model);
+                    Serial.print("Model:"); Serial.println(tempstr);
+                    tempstr = String(ipcnf.ip.node);
+                    Serial.print("Node:"); Serial.println(tempstr);
                     tempstr = String(ipcnf.ip.ip[0])+'.'+String(ipcnf.ip.ip[1])+'.'+String(ipcnf.ip.ip[2])+'.'+String(ipcnf.ip.ip[3]);
-                    Serial.print("MQTT IP:"); Serial.println(tempstr);
+                    Serial.print("IP:"); Serial.println(tempstr);
                 } 
-            }else {
+            }else {         // передача текущих данных
                 if(millis() - lastReceiveUC > MAX_SEND_WAIT*10){
                     indData = 0;
                     // Serial.print("lastReceiveUC:"); Serial.println(millis() - lastReceiveUC);
@@ -324,7 +327,7 @@ void receiveUCSerial(){
         }
     }
 }
-//-------------------------------------------------------------------------
+//--------------- режим моста BT -------------------------------------------------
 void receiveBlueTooth(){
     int read = SerialBT.read();
     if(isConnected){
@@ -357,6 +360,20 @@ void receiveBlueTooth(){
             enableEscape();
         }
     }
+    } else {
+        if(read != -1) {
+        if(monitorBridgeEnabled()) {
+            if(ucTx || bridgeInit == false) {
+                Serial.println();
+                Serial.print("WiFi> ");
+                ucTx = false;
+                bridgeInit = true;
+            }
+            Serial.print((char)read);
+            Serial.print(";");
+        }
+        UCSerial.write((char)read);
+        }
     }
 }
 //-------------------------------------------------------------------------
