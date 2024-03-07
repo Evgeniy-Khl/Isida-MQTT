@@ -132,12 +132,11 @@ void connectMqttBroker() {
     Serial.println("Attempting MQTT connection...");
     if (mqttClient.connect(clientId.c_str())) {
       Serial.println("Connected to MQTT broker!");
-      mqttClient.subscribe("ISIDA/N_1/set");
+      mqttClient.subscribe("ISIDA/N_1/set/#");
       // mqttClient.subscribe("topic2");
     } else {
       Serial.print("Failed to connect to MQTT broker, MQTT_");
-      switch (mqttClient.state())
-      {
+      switch (mqttClient.state()){
       case MQTT_CONNECTION_TIMEOUT:
         Serial.print("CONNECTION_TIMEOUT");
         break;
@@ -173,11 +172,21 @@ void connectMqttBroker() {
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  String val="";
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
+    val.concat((char)payload[i]);
   }
   Serial.println();
+  
+  String command = topic;
+  int idx = command.lastIndexOf('/')+1;
+  String cmd = command.substring(idx);
+  Serial.print("idx="); Serial.print(idx); Serial.print("  cmd:"); Serial.println(cmd);
+  Serial.print("val="); Serial.println(val);
+  if(cmd=="state") upv.pv.state = val.toInt();
+  if(cmd=="extmode") upv.pv.extendMode = val.toInt();
 }
