@@ -59,6 +59,7 @@ bool datacomplit = false;
 BluetoothSerial SerialBT;
 HardwareSerial UCSerial(1);
 MultiSerial CmdSerial;
+uint8_t tmpdata[MQTT_SEND_BUFFER+2];
 uint8_t UC_SEQUENCE[] = {1,9,4,0,87,0,128,0};
 char BT_CTRL_ESCAPE_SEQUENCE[] = {'\4', '\4', '\4', '!'};
 uint8_t BT_CTRL_ESCAPE_SEQUENCE_LENGTH = sizeof(BT_CTRL_ESCAPE_SEQUENCE)/sizeof(BT_CTRL_ESCAPE_SEQUENCE[0]);
@@ -312,22 +313,20 @@ void receiveUCSerial(){
                     // Serial.print("lastReceiveUC:"); Serial.println(millis() - lastReceiveUC);
                     lastReceiveUC = millis();
                 }
-                upv.pvdata[indData++] = read;
-                if(upv.pvdata[indData-1]==10 && upv.pvdata[indData-2]==13) {
+                tmpdata[indData++] = read;
+                if(tmpdata[indData-1]==10 && tmpdata[indData-2]==13) {
+                    uint16_t crc=0, crcsum;
+                    for(int8_t i=0;i<indData-4;i++) {
+                        crc += tmpdata[i];
+                        crc ^= (crc>>2);
+                    }
+                    crcsum = tmpdata[indData-3]*256 + tmpdata[indData-4];
+                    // Serial.print("IND="); Serial.print(indData-3); Serial.print("  dt0="); Serial.print(tmpdata[indData-4]); Serial.print("  dt1="); Serial.println(tmpdata[indData-3]);
+                    // Serial.print("CRC="); Serial.print(crc); Serial.print("  SUM="); Serial.println(crcsum);
+                    if(crcsum==crc) memcpy(&upv.pvdata,&tmpdata,MQTT_SEND_BUFFER);
                     indData = 0;
                 }
-            // upv.pvdata[indData++] = read;
-            // if(upv.pvdata[indData-1]==10 && upv.pvdata[indData-2]==13) {
-            //     indData = 0;
-            //     if(indData==MQTT_SEND_BUFFER){
-            //         datacomplit = true;
-            //         digitalWrite(PIN_WIFI_CONECTED, HIGH);  // WiFi conected!
-            //     }
-            // }
-            // else if(indData>MQTT_SEND_BUFFER){
-            //   indData = 0; 
-
-            // }
+            
             
             }
         }
