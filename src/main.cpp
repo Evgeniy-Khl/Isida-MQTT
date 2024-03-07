@@ -44,7 +44,7 @@ const char* mqttUsername = "your_mqtt_username";
 const char* mqttPassword = "your_mqtt_password";
 
 uint8_t seconds=0;
-String topic, payload,  mainTopic = MAIN_TOPIC, identif;
+String topic, payload,  mainTopic = MAIN_TOPIC, clientId ;
 union {
   uint8_t data[6];
   struct {
@@ -126,13 +126,13 @@ void setup() {
     mainTopic = MAIN_TOPIC + String(ipcnf.ip.node);
     Serial.println();
     Serial.print("MQTT Main topic:"); Serial.println(mainTopic);
-    // identif = String(upv.pv.ip[0])+'.'+String(upv.pv.ip[1])+'.'+String(upv.pv.ip[2])+'.'+String(upv.pv.ip[3]);
-    // Serial.print("MQTT IP:"); Serial.println(identif);
+    // clientId  = String(upv.pv.ip[0])+'.'+String(upv.pv.ip[1])+'.'+String(upv.pv.ip[2])+'.'+String(upv.pv.ip[3]);
+    // Serial.print("MQTT IP:"); Serial.println(clientId );
 
     //------- New name bluetooth -------
-    identif = "ISIDA-" + String(ipcnf.ip.node);
-    Serial.print("New name bluetooth:"); Serial.println(identif);
-    SerialBT.begin(identif);
+    clientId  = "ISIDA-" + String(ipcnf.ip.node);
+    Serial.print("New name bluetooth:"); Serial.println(clientId );
+    SerialBT.begin(clientId );
     CmdSerial.addInterface(&SerialBT);
 
     while(CmdSerial.available()) {
@@ -164,6 +164,7 @@ void setup() {
     Serial.print("WiFi conected IP: ");
     Serial.println(WiFi.localIP());
     //---------------------- Настройка MQTT клиента -----------------------
+    // https://github.com/knolleary/pubsubclient/blob/master/examples/mqtt_esp8266/mqtt_esp8266.ino
     mqttClient.setServer(mqttServer, mqttPort);
     mqttClient.setCallback(mqttCallback);
     
@@ -245,6 +246,7 @@ void loop() {
     }
   
   // Обработка MQTT сообщений
+  // https://github.com/knolleary/pubsubclient/blob/master/examples/mqtt_esp8266/mqtt_esp8266.ino
   mqttClient.loop();
   // Отправка MQTT сообщений каждые 5 сек.
   if(millis() - lastSendMqtt > MQTT_SEND_WAIT){

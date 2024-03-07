@@ -3,7 +3,7 @@
 #include "main.h"
 #include <PubSubClient.h>
 
-extern String topic, payload,  mainTopic, identif;
+extern String topic, payload,  mainTopic, clientId ;
 extern pvValue upv;
 extern WiFiClient wifiClient;
 extern PubSubClient mqttClient;
@@ -12,25 +12,25 @@ void mqttConfig(void) {
   //---------------------- Discovery topic -------------------------------
     Serial.print("ESP Board MAC Address:  ");
     Serial.println(WiFi.macAddress());
-    identif = "isida_" + WiFi.macAddress();
-    identif.replace(":","");
+    clientId  = "isida_" + WiFi.macAddress();
+    clientId .replace(":","");
     Serial.print("identifiers:  ");
-    Serial.println(identif);
-    topic = "homeassistant/sensor/" + identif + "_temper1/config";
+    Serial.println(clientId );
+    topic = "homeassistant/sensor/" + clientId  + "_temper1/config";
 
     Serial.println(); Serial.print("Discovery topic: "); Serial.println(topic);
 
     payload = "{\"name\": \"Temper1\",\"state_topic\": \"ISIDA/Node1/temper1\",\"device_class\": \"temperature\",\"value_template\": \"{{ value | round(2) }}\",\"unique_id\":\"";
-    payload += identif;
-    payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"" + identif + "\"]}}";
+    payload += clientId ;
+    payload += "_temper1\",\"device\": {\"name\": \"ISIDA\",\"identifiers\": [\"" + clientId  + "\"]}}";
     // std::string payload = "{\"name\": \"Temper1\","
     //                  "\"state_topic\": \"" + std::string(mainTopic.c_str()) + "/temper1\","
     //                  "\"device_class\": \"temperature\","
     //                  "\"value_template\": \"{{ value | round(2) }}\","
-    //                  "\"unique_id\":\"" + std::string(identif.c_str()) + "_temper1\","
+    //                  "\"unique_id\":\"" + std::string(clientId .c_str()) + "_temper1\","
     //                  "\"device\": {"
     //                  "\"name\": \"ISIDA\","
-    //                  "\"identifiers\": [\"" + std::string(identif.c_str()) + "\"]"
+    //                  "\"identifiers\": [\"" + std::string(clientId .c_str()) + "\"]"
     //                  "}}";
     
     Serial.println(payload.c_str()); Serial.println();
@@ -127,13 +127,13 @@ void sendMqttBroker(void) {
     payload = String(upv.pv.programm);
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
 }
-
+// https://github.com/knolleary/pubsubclient/blob/master/examples/mqtt_esp8266/mqtt_esp8266.ino
 void connectMqttBroker() {
-    Serial.println("Connecting to MQTT broker...");
-    if (mqttClient.connect("ESP8266Client")) {
+    Serial.println("Attempting MQTT connection...");
+    if (mqttClient.connect(clientId.c_str())) {
       Serial.println("Connected to MQTT broker!");
-      mqttClient.subscribe("topic1");
-      mqttClient.subscribe("topic2");
+      mqttClient.subscribe("ISIDA/N_1/set");
+      // mqttClient.subscribe("topic2");
     } else {
       Serial.print("Failed to connect to MQTT broker, MQTT_");
       switch (mqttClient.state())
@@ -172,12 +172,12 @@ void connectMqttBroker() {
     }
 }
 
-void receivedCallback(uint32_t from, String &msg) {
-  // Обработка полученных сообщений от других узлов в сети mesh
-  // ...
-}
-
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  // Обработка полученного сообщения от MQTT брокера
-  // ...
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
 }
