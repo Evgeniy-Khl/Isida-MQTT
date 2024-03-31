@@ -3,7 +3,11 @@
 #include "main.h"
 #include <PubSubClient.h>
 
-extern String topic, payload,  mainTopic, clientId ;
+union {
+    uint8_t buff[8] = {1, 9, 0, 0, 0, 0, 0, 0};
+    uint16_t val[4];
+} tx;
+extern String topic, payload,  mainTopic, clientId;
 extern pvValue upv;
 extern WiFiClient wifiClient;
 extern PubSubClient mqttClient;
@@ -107,14 +111,18 @@ void sendMqttBroker(void) {
     topic = mainTopic + "/just_turn";
     if(upv.pv.state & 0x80) payload = "turn"; else payload = "off";
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
-    topic = mainTopic + "/heater_2";
-    if(upv.pv.state & 0x80) payload = "heat"; else payload = "off";
+    // topic = mainTopic + "/heater_2/action";
+    // if(upv.pv.state & 0x01) payload = "drying"; else payload = "off";
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
+    topic = mainTopic + "/heater_2/state";
+    if(!(upv.pv.state & 0x01)) payload = "off";
+    else if(upv.pv.hihEnable) payload = "off"; else payload = "dry";
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/humidifier/action";
-    if(upv.pv.state & 0x80) payload = "off"; else payload = "humidifying";
+    if(upv.pv.state & 0x01) payload = "humidifying"; else payload = "off";
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     topic = mainTopic + "/humidifier/state";
-    if(upv.pv.state & 0x80) payload = "0"; else payload = "1";
+    if(upv.pv.hihEnable) payload = "1"; else payload = "0";
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
     //------------------------------
     topic = mainTopic + "/extendmode";
@@ -185,8 +193,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String command = topic;
   int idx = command.lastIndexOf('/')+1;
   String cmd = command.substring(idx);
-  Serial.print("idx="); Serial.print(idx); Serial.print("  cmd:"); Serial.println(cmd);
-  Serial.print("val="); Serial.println(val);
-  if(cmd=="state") upv.pv.state = val.toInt();
-  if(cmd=="extmode") upv.pv.extendMode = val.toInt();
+  Serial.print("cmd:"); Serial.print(cmd);  Serial.print("  val="); Serial.println(val);
+  if(cmd=="state")   {tx.buff[2]=0x04; tx.buff[4]=87; tx.val[3]=val.toInt(); sendBufferUC(tx.buff,8);}
+  if(cmd=="extmode") {tx.buff[2]=0x04; tx.buff[4]=88; tx.val[3]=val.toInt(); sendBufferUC(tx.buff,8);}
+  if(cmd=="relmode") {tx.buff[2]=0x04; tx.buff[4]=89; tx.val[3]=val.toInt(); sendBufferUC(tx.buff,8);}
+  if(cmd=="program") {tx.buff[2]=0x04; tx.buff[4]=90; tx.val[3]=val.toInt(); sendBufferUC(tx.buff,8);}
+  if(cmd=="temper1") {tx.buff[2]=0x04; tx.buff[4]=51; tx.val[3]=val.toFloat()*10; sendBufferUC(tx.buff,8);}
+  if(cmd=="temper2") {tx.buff[2]=0x04; tx.buff[4]=52; tx.val[3]=val.toFloat()*10; sendBufferUC(tx.buff,8);}
+  if(cmd=="humidity"){tx.buff[2]=0x04; tx.buff[4]=53; tx.val[3]=val.toInt(); sendBufferUC(tx.buff,8);}
 }

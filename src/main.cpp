@@ -31,7 +31,6 @@ void mqttConfig(void);
 void receivedCallback(uint32_t from, String & msg);
 void receiveUCSerial(void);
 void sendBufferNow(void);
-void sendBufferUC(const uint8_t *buffer, size_t size);
 void receiveBlueTooth(void);
 
 
@@ -59,8 +58,12 @@ bool datacomplit = false;
 BluetoothSerial SerialBT;
 HardwareSerial UCSerial(1);
 MultiSerial CmdSerial;
-uint8_t tmpdata[MQTT_SEND_BUFFER+2];
-uint8_t UC_SEQUENCE[] = {1,9,4,0,87,0,128,0};
+uint8_t rxBuff[MQTT_SEND_BUFFER+2];
+extern union {
+    uint8_t buff[8];
+    uint16_t val[4];
+} tx;
+
 char BT_CTRL_ESCAPE_SEQUENCE[] = {'\4', '\4', '\4', '!'};
 uint8_t BT_CTRL_ESCAPE_SEQUENCE_LENGTH = sizeof(BT_CTRL_ESCAPE_SEQUENCE)/sizeof(BT_CTRL_ESCAPE_SEQUENCE[0]);
 
@@ -253,10 +256,7 @@ void loop() {
   if(millis() - lastSendMqtt > MQTT_SEND_WAIT){
     lastSendMqtt = millis();
     if (mqttClient.connected()) {
-        sendMqttBroker();
-        //-----------------------------
-        sendBufferUC(UC_SEQUENCE,8);
-        //-----------------------------
+        if(upv.pv.model) sendMqttBroker();
     } else {
         connectMqttBroker();
     }
@@ -313,21 +313,19 @@ void receiveUCSerial(){
                     // Serial.print("lastReceiveUC:"); Serial.println(millis() - lastReceiveUC);
                     lastReceiveUC = millis();
                 }
-                tmpdata[indData++] = read;
-                if(tmpdata[indData-1]==10 && tmpdata[indData-2]==13) {
+                rxBuff[indData++] = read;
+                if(rxBuff[indData-1]==10 && rxBuff[indData-2]==13) {
                     uint16_t crc=0, crcsum;
                     for(int8_t i=0;i<indData-4;i++) {
-                        crc += tmpdata[i];
+                        crc += rxBuff[i];
                         crc ^= (crc>>2);
                     }
-                    crcsum = tmpdata[indData-3]*256 + tmpdata[indData-4];
+                    crcsum = rxBuff[indData-3]*256 + rxBuff[indData-4];
                     // Serial.print("IND="); Serial.print(indData-3); Serial.print("  dt0="); Serial.print(tmpdata[indData-4]); Serial.print("  dt1="); Serial.println(tmpdata[indData-3]);
                     // Serial.print("CRC="); Serial.print(crc); Serial.print("  SUM="); Serial.println(crcsum);
-                    if(crcsum==crc) memcpy(&upv.pvdata,&tmpdata,MQTT_SEND_BUFFER);
+                    if(crcsum==crc) memcpy(&upv.pvdata,&rxBuff,MQTT_SEND_BUFFER);
                     indData = 0;
                 }
-            
-            
             }
         }
     }
@@ -401,17 +399,16 @@ void sendBufferNow() {
 void sendBufferUC(const uint8_t *buffer, size_t size) {
     union {
         uint8_t data[4] = {0,0,13,10};
-        struct {
-            uint16_t crc;
-        } str;   
+        uint16_t crc; 
     } un;
-    UC_SEQUENCE[1]++;
-    un.str.crc=0;
-    for(int8_t i=0;i<8;i++) {
-        un.str.crc += buffer[i];
-        un.str.crc ^= (un.str.crc>>2);
+    un.crc=0;
+    for(int8_t i = 0; i < size; i++) {
+        Serial.print(buffer[i]); Serial.print(";");
+        un.crc += buffer[i];
+        un.crc ^= (un.crc>>2);
     }
+    Serial.print("        crc0="); Serial.print(un.data[0]); Serial.print(";crc1="); Serial.println(un.data[1]);
     UCSerial.write(buffer, size);
     UCSerial.write(un.data, 4);
-    lastSend = millis();
+    // lastSend = millis();
 }

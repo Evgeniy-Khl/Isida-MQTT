@@ -31,9 +31,9 @@
 // Этот контакт будет переведен в ВЫСОКИЙ уровень (если он определен), когда устройство будет готово к подключению.
 #define PIN_READY 2
 #define PIN_MONITOR 5
-#define PIN_WIFI_CONECTED 18
+#define PIN_WIFI_CONECTED 18  // PIN_WIFI_Pin GPIO_PIN_15; PIN_WIFI_GPIO_Port GPIOA
 // This pin will be pulled HIGH when a client is connected over bluetooth.
-#define PIN_CONNECTED 4
+#define PIN_CONNECTED 4       // Bluetooth_STATE_Pin GPIO_PIN_8; Bluetooth_STATE_GPIO_Port GPIOA
 // Если ваш микроконтроллер выведет этот вывод на ВЫСОКИЙ уровень, он сможет отправлять команды непосредственно на модуль ESP32.
 #define BT_KEY 16
 // Подключите его к линии сброса микроконтроллера, чтобы вы могли сбросить микроконтроллер по своему желанию.
@@ -56,6 +56,12 @@ void newConnectionCallback(uint32_t nodeId);
 void changedConnectionCallback(); 
 void nodeTimeAdjustedCallback(int32_t offset); 
 void delayReceivedCallback(uint32_t from, int32_t delay);
+void sendBufferUC(const uint8_t *buffer, size_t size);
+
+union d2v{
+  uint8_t date[2];
+  uint16_t val;
+};
 
 union pvValue{
   uint8_t pvdata[MQTT_SEND_BUFFER];
